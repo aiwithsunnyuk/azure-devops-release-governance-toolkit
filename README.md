@@ -1,16 +1,21 @@
-# azure-devops-release-governance-toolkit
-
-## Architecture Overview
-
-```mermaid
-flowchart TD
-    A[Git Push / PR] --> B[CI: Lint & Unit Tests]
-    B --> C[Step Template: SAST Scan]
-    C --> D[Artifact / Image Registry]
-    D --> E[CD: Staging Deployment]
-    E --> F[Step Template: Automated Smoke Tests]
-    F --> G{Manual Approval Gate}
-    G -- Approved --> H[CD: Production Rolling / Blue-Green]
-    H --> I[Canary Health Check]
-    I --> J[Release Notes Generation]
 ---
+
+## Directory Structure
+
+```text
+.
+├── .azuredevops
+│   └── pull_request_template.md
+├── pipelines
+│   ├── templates
+│   │   ├── steps
+│   │   │   ├── sast-scan.yml
+│   │   │   └── automated-smoke-test.yml
+│   │   └── jobs
+│   ├── ci-pipeline.yml
+│   └── cd-release-pipeline.yml
+├── scripts
+│   └── bash
+│       └── generate-release-notes.sh
+└── terraform
+    └── environments
