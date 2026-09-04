@@ -1,0 +1,16 @@
+# Terraform local state
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# OS & IDE metadata
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temporary run artifacts
+*.log
+RELEASE_NOTES.md

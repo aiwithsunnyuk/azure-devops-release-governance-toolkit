@@ -1,0 +1,64 @@
+trigger: none
+
+resources:
+  pipelines:
+    - pipeline: ci-build
+      source: 'CI-Build-Pipeline'
+      trigger:
+        branches:
+          include:
+            - main
+
+variables:
+  - name: environmentName
+    value: 'Production'
+  - name: appName
+    value: 'order-processing-service'
+
+stages:
+  - stage: Staging_Deployment
+    displayName: 'Deploy to Staging & Run Verification'
+    jobs:
+      - deployment: DeployStaging
+        environment: 'staging'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: Bash@3
+                  displayName: 'Deploy Package to Staging Cluster'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      echo "Applying deployment to Staging environment..."
+                - template: templates/steps/automated-smoke-test.yml
+                  parameters:
+                    targetEndpoint: 'https://staging.internal.domain/healthz'
+
+  - stage: Production_Deployment
+    displayName: 'Regulated Production Release'
+    dependsOn: Staging_Deployment
+    condition: succeeded()
+    jobs:
+      - deployment: DeployProduction
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: Bash@3
+                  displayName: 'Execute Automated Release Notes Aggregation'
+                  inputs:
+                    filePath: 'scripts/bash/generate-release-notes.sh'
+                    arguments: '$(Build.SourceVersion)'
+                - task: Bash@3
+                  displayName: 'Trigger Rolling Deployment'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      echo "Releasing build $(Build.BuildId) to Production..."
+                - template: templates/steps/automated-smoke-test.yml
+                  parameters:
+                    targetEndpoint: 'https://api.domain.com/healthz'

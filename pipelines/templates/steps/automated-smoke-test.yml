@@ -1,0 +1,37 @@
+parameters:
+  - name: targetEndpoint
+    type: string
+  - name: maxRetries
+    type: number
+    default: 5
+  - name: retryIntervalSeconds
+    type: number
+    default: 10
+
+steps:
+  - task: Bash@3
+    displayName: 'Run Canary & Live Endpoint Smoke Tests'
+    inputs:
+      targetType: 'inline'
+      script: |
+        set -euo pipefail
+        URL="${{ parameters.targetEndpoint }}"
+        RETRIES=${{ parameters.maxRetries }}
+        INTERVAL=${{ parameters.retryIntervalSeconds }}
+
+        echo "Validating health endpoint: $URL"
+        count=0
+        until [ $count -ge$RETRIES ]
+        do
+          STATUS=$(curl -s -o /dev/null -w "\%{http_code}" "$URL" || true)
+          if [ "$STATUS" -eq 200 ]; then
+            echo "Endpoint health check PASSED with status code: $STATUS"
+            exit 0
+          fi
+          echo "Endpoint returned status $STATUS. Retrying in $INTERVAL seconds ($((count+1))/$RETRIES)..."
+          sleep $INTERVAL
+          count=$((count+1))
+        done
+
+        echo "Error: Service health check failed after $RETRIES attempts." >&2
+        exit 1
