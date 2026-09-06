@@ -1,101 +1,48 @@
-# azure-devops-release-governance-toolkit
+# Azure DevOps Release Governance Toolkit
 
-## Architecture Overview
+[![CI & Governance Quality Gate](https://github.com/aiwithsunnyuk/azure-devops-release-governance-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/aiwithsunnyuk/azure-devops-release-governance-toolkit/actions)
+![Python Version](https://img.shields.io/badge/python-3.11-blue.svg)
+![Framework](https://img.shields.io/badge/framework-Streamlit%20%7C%20Pydantic-red.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Compliance](https://img.shields.io/badge/governance-SOC2%20%7C%20ISO27001%20%7C%20SLSA-success.svg)
+
+An enterprise deployment quality gate and release orchestration control plane for **Azure Pipelines**. It bridges release automation, security compliance, and change management into an automated, auditable gatekeeper preventing risky code from reaching production.
+
+---
+
+## The Problem It Solves
+
+Modern CI/CD pipelines move fast, but enterprise deployments require strict guardrails. Development, DevOps, and Security teams often face:
+* **Manual Change Advisory Board (CAB) bottlenecks:** Hours wasted chasing approvals and audit evidence across disconnected tools.
+* **Late-stage CVE discoveries:** High-severity vulnerabilities slipping through CI steps into staging and production clusters.
+* **Lack of unified visibility:** No central pane where engineering leads, compliance auditors, and release managers can inspect build artifacts, coverage metrics, and SBOM provenance simultaneously.
+
+This toolkit provides a **programmable, shift-left governance layer** that acts as an automated gatekeeper. If pre-configured baselines (coverage, CVE thresholds, SonarQube quality gates, branch protections) pass, releases progress automatically; if policies fail, clear audit paths and break-glass override protocols are enforced.
+
+---
+
+## Architectural Workflow
 
 ```mermaid
 flowchart TD
-    A[Git Push / PR] --> B[CI: Lint & Unit Tests]
-    B --> C[Step Template: SAST Scan]
-    C --> D[Artifact / Image Registry]
-    D --> E[CD: Staging Deployment]
-    E --> F[Step Template: Automated Smoke Tests]
-    F --> G{Manual Approval Gate}
-    G -- Approved --> H[CD: Production Rolling / Blue-Green]
-    H --> I[Canary Health Check]
-    I --> J[Release Notes Generation]
-```
-## Directory Structure
+    Build[Azure Pipelines CI / Build Stage] --> Package[Artifact Packaging & Container Registry]
+    Package --> Evaluator[Governance & Quality Gate Engine]
 
-```text
-.
-├── .azuredevops
-│   └── pull_request_template.md
-├── pipelines
-│   ├── templates
-│   │   ├── steps
-│   │   │   ├── sast-scan.yml
-│   │   │   └── automated-smoke-test.yml
-│   │   └── jobs
-│   ├── ci-pipeline.yml
-│   └── cd-release-pipeline.yml
-├── scripts
-│   └── bash
-│       └── generate-release-notes.sh
-└── terraform
-    └── environments
-```
-Governance Controls
-``` text
-Component	Standard / Enforcement	Implementation
-Static Security	Zero High/Critical CVEs	pipelines/templates/steps/sast-scan.yml
-Quality Gate	HTTP 200 via Exponential Retry	pipelines/templates/steps/automated-smoke-test.yml
-Approval Flow	Multi-party Environment Gates	pipelines/cd-release-pipeline.yml
-Audit Trail	Immutable Commit Log Diff	scripts/bash/generate-release-notes.sh
-```
-Pipeline Configuration
+    subgraph Automated Policy Evaluations
+        Evaluator --> Cov[Code Coverage Baseline >= 80%]
+        Evaluator --> Sonar[SonarQube Quality Gate == PASS]
+        Evaluator --> Sec[Vulnerability Scan: 0 Critical / 0 High CVEs]
+        Evaluator --> SBOM[CycloneDX SBOM Provenance Check]
+    end
 
-1. Template Usage
-```text
-steps:
-  - template: pipelines/templates/steps/automated-smoke-test.yml
-    parameters:
-      targetEndpoint: 'https://api.internal.domain/healthz'
-      maxRetries: 5
-      retryIntervalSeconds: 10
-```
-2. CI Pipeline
-```text
-trigger:
-  branches:
-    include:
-      - main
-      - release/*
+    Cov --> Decision{All Baselines Satisfied?}
+    Sonar --> Decision
+    Sec --> Decision
+    SBOM --> Decision
 
-stages:
-  - stage: Lint_and_Scan
-    jobs:
-      - job: SecurityGovernance
-        steps:
-          - template: templates/steps/sast-scan.yml
-            parameters:
-              scanTarget: '$(Build.SourcesDirectory)'
-              severityThreshold: 'HIGH,CRITICAL'
-```
-3. CD Pipeline
-```text
-stages:
-  - stage: Staging_Deployment
-    jobs:
-      - deployment: DeployStaging
-        environment: 'staging'
-  - stage: Production_Deployment
-    dependsOn: Staging_Deployment
-    jobs:
-      - deployment: DeployProduction
-        environment: 'production'
-```
-Execution Commands
+    Decision -->|PASS| AutoDeploy[Automated Release Dispatch to Target Stage]
+    Decision -->|FAIL| Blocked[Deployment Blocked]
 
-Health Check
-```text
-curl -s -o /dev/null -w "%{http_code}" https://api.domain.com/healthz
-```
-Release Notes Generation
-```text
-bash scripts/bash/generate-release-notes.sh HEAD
-```
-License
-
-MIT
-
-
+    Blocked --> CAB[Manual CAB Review / Audited Break-Glass Override]
+    CAB -->|Approved & Justified| AutoDeploy
+    CAB -->|Rejected| Terminate[Pipeline Terminated]
