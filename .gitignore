@@ -1,16 +1,9 @@
-# Terraform local state
-**/.terraform/*
-*.tfstate
-*.tfstate.*
-*.tfvars
-!*.tfvars.example
-
-# OS & IDE metadata
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.pytest_cache/
 .DS_Store
-Thumbs.db
-.vscode/
-.idea/
-
-# Temporary run artifacts
-*.log
-RELEASE_NOTES.md
